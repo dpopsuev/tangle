@@ -26,6 +26,24 @@ const (
 	openRouterBaseURL = "https://openrouter.ai/api/v1"
 )
 
+// envFallbacks maps canonical env var names to fallback aliases.
+// Claude Code uses CLOUD_ML_REGION / ANTHROPIC_VERTEX_PROJECT_ID;
+// Google Cloud SDK uses GOOGLE_CLOUD_LOCATION / GOOGLE_CLOUD_PROJECT.
+var envFallbacks = map[string]string{
+	"GOOGLE_CLOUD_LOCATION": "CLOUD_ML_REGION",
+	"GOOGLE_CLOUD_PROJECT":  "ANTHROPIC_VERTEX_PROJECT_ID",
+}
+
+func envWithFallback(name string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	if fallback, ok := envFallbacks[name]; ok {
+		return os.Getenv(fallback)
+	}
+	return ""
+}
+
 // providerSpec defines a supported provider and its requirements.
 type providerSpec struct {
 	name    string   // canonical name
@@ -75,7 +93,7 @@ func findProvider(name string) (providerSpec, bool) {
 // checkCredentials verifies all required env vars are set for a provider.
 func checkCredentials(spec providerSpec) error {
 	for _, env := range spec.envVars {
-		if os.Getenv(env) == "" {
+		if envWithFallback(env) == "" {
 			return fmt.Errorf("%w: %s", ErrCredentialsMissing, spec.envHint)
 		}
 	}
@@ -129,7 +147,7 @@ func NewProviderWithConfig(name string, cfg ProviderConfig) (anyllm.Provider, er
 func createProvider(spec providerSpec) (anyllm.Provider, error) {
 	switch spec.name {
 	case "vertex-ai":
-		return NewVertexProvider(context.Background(), os.Getenv(envVertexRegion), os.Getenv(envVertexProject))
+		return NewVertexProvider(context.Background(), envWithFallback(envVertexRegion), envWithFallback(envVertexProject))
 	case "anthropic-api":
 		return anyllmAnthropic.New()
 	case "openai-api":
