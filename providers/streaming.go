@@ -9,3 +9,7 @@ import (
 type StreamingProvider interface {
 	CompletionWithCallback(ctx context.Context, params anyllm.CompletionParams, onToken func(string)) (*anyllm.ChatCompletion, error)
 }
+
+type ThinkingProvider interface {
+	SetThinkingBudget(tokens int64)
+}

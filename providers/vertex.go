@@ -35,7 +35,8 @@ const (
 // Vertex AI authentication. Bypasses any-llm-go's Anthropic provider
 // which doesn't support custom client options.
 type VertexProvider struct {
-	client *anthropic.Client
+	client         *anthropic.Client
+	thinkingBudget int64
 }
 
 var _ anyllm.Provider = (*VertexProvider)(nil)
@@ -52,6 +53,9 @@ func NewVertexProvider(ctx context.Context, region, projectID string) (*VertexPr
 
 // Name returns the provider identifier.
 func (v *VertexProvider) Name() string { return vertexProviderName }
+
+// SetThinkingBudget sets the thinking token budget for extended thinking.
+func (v *VertexProvider) SetThinkingBudget(tokens int64) { v.thinkingBudget = tokens }
 
 // Completion sends a chat completion request via Vertex AI.
 func (v *VertexProvider) Completion(ctx context.Context, params anyllm.CompletionParams) (*anyllm.ChatCompletion, error) {
@@ -82,6 +86,13 @@ func (v *VertexProvider) Completion(ctx context.Context, params anyllm.Completio
 	// Pass system prompt if extracted from messages.
 	if system != "" {
 		req.System = []anthropic.TextBlockParam{{Text: system}}
+	}
+
+	// Pass thinking budget if set via ThinkingProvider.
+	if v.thinkingBudget > 0 {
+		req.Thinking = anthropic.ThinkingConfigParamUnion{
+			OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: v.thinkingBudget},
+		}
 	}
 
 	// Pass through Tools.

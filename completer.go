@@ -6,11 +6,13 @@ import (
 )
 
 type CompletionParams struct {
-	Prompt    string
-	Messages  []Message
-	Tools     []Tool
-	MaxTokens int
-	OnToken   func(token string) `json:"-"`
+	Prompt        string
+	Messages      []Message
+	Tools         []Tool
+	MaxTokens     int
+	OnToken       func(token string) `json:"-"`
+	ThinkingLevel string
+	SessionID     string
 }
 
 type Message struct {

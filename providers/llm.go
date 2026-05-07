@@ -60,6 +60,20 @@ func NewCompleter(provider anyllm.Provider, model string, recorder UsageRecorder
 			})
 		}
 
+		if params.ThinkingLevel != "" {
+			if tp, ok := provider.(ThinkingProvider); ok {
+				budgets := map[string]int64{
+					"minimal": 128,
+					"low":     512,
+					"medium":  2048,
+					"high":    8192,
+				}
+				if b, ok := budgets[params.ThinkingLevel]; ok {
+					tp.SetThinkingBudget(b)
+				}
+			}
+		}
+
 		var resp *anyllm.ChatCompletion
 		var err error
 
