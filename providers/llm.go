@@ -60,7 +60,18 @@ func NewCompleter(provider anyllm.Provider, model string, recorder UsageRecorder
 			})
 		}
 
-		resp, err := provider.Completion(ctx, req)
+		var resp *anyllm.ChatCompletion
+		var err error
+
+		if params.OnToken != nil {
+			if sp, ok := provider.(StreamingProvider); ok {
+				resp, err = sp.CompletionWithCallback(ctx, req, params.OnToken)
+			} else {
+				resp, err = provider.Completion(ctx, req)
+			}
+		} else {
+			resp, err = provider.Completion(ctx, req)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("llm completion: %w", err)
 		}

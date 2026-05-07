@@ -116,6 +116,7 @@ func (v *VertexProvider) Completion(ctx context.Context, params anyllm.Completio
 	}
 
 	resp, err := v.client.Messages.New(ctx, req)
+
 	elapsed := time.Since(start)
 	if err != nil {
 		classified := classifyVertexError(err)
@@ -180,6 +181,74 @@ func (v *VertexProvider) CompletionStream(_ context.Context, _ anyllm.Completion
 	return chunks, errs
 }
 
+
+var _ StreamingProvider = (*VertexProvider)(nil)
+
+func (v *VertexProvider) CompletionWithCallback(ctx context.Context, params anyllm.CompletionParams, onToken func(string)) (*anyllm.ChatCompletion, error) {
+	msgs, system := convertMessages(params.Messages)
+
+	maxTokens := vertexMaxTokensFallback
+	if params.MaxTokens != nil && *params.MaxTokens > 0 {
+		maxTokens = int64(*params.MaxTokens)
+	}
+
+	req := anthropic.MessageNewParams{
+		Model:     anthropic.Model(params.Model),
+		Messages:  msgs,
+		MaxTokens: maxTokens,
+	}
+	if system != "" {
+		req.System = []anthropic.TextBlockParam{{Text: system}}
+	}
+	if len(params.Tools) > 0 {
+		tools := make([]anthropic.ToolUnionParam, 0, len(params.Tools))
+		for _, tool := range params.Tools {
+			schema := anthropic.ToolInputSchemaParam{Type: "object"}
+			if tool.Function.Parameters != nil {
+				if props, ok := tool.Function.Parameters["properties"]; ok {
+					schema.Properties = props
+				}
+				if req, ok := tool.Function.Parameters["required"]; ok {
+					if strs, ok := toStringSlice(req); ok {
+						schema.Required = strs
+					}
+				}
+			}
+			tools = append(tools, anthropic.ToolUnionParam{
+				OfTool: &anthropic.ToolParam{
+					Name:        tool.Function.Name,
+					Description: anthropic.String(tool.Function.Description),
+					InputSchema: schema,
+				},
+			})
+		}
+		req.Tools = tools
+	}
+
+	stream := v.client.Messages.NewStreaming(ctx, req)
+	var acc anthropic.Message
+	for stream.Next() {
+		event := stream.Current()
+		acc.Accumulate(event)
+		if delta, ok := extractTextDelta(event); ok {
+			onToken(delta)
+		}
+	}
+	if stream.Err() != nil {
+		return nil, classifyVertexError(stream.Err())
+	}
+
+	return convertResponse(&acc), nil
+}
+
+func extractTextDelta(event anthropic.MessageStreamEventUnion) (string, bool) {
+	if event.Type == "content_block_delta" {
+		if event.Delta.Type == "text_delta" {
+			return event.Delta.Text, true
+		}
+	}
+	return "", false
+}
 
 func convertResponse(resp *anthropic.Message) *anyllm.ChatCompletion {
 	var content string

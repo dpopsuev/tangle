@@ -10,6 +10,7 @@ type CompletionParams struct {
 	Messages  []Message
 	Tools     []Tool
 	MaxTokens int
+	OnToken   func(token string) `json:"-"`
 }
 
 type Message struct {
