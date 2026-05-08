@@ -122,3 +122,19 @@ func NewCompleter(provider anyllm.Provider, model string, recorder UsageRecorder
 		return completion, nil
 	}
 }
+
+func NewCompleterFromEnv(envName, model string) (tangle.Completer, error) {
+	p, err := NewProviderFromEnv(envName)
+	if err != nil {
+		return nil, err
+	}
+	return NewCompleter(p, model, nil), nil
+}
+
+func NewCompleterByName(providerName, model string) (tangle.Completer, error) {
+	p, err := NewProviderByName(providerName)
+	if err != nil {
+		return nil, err
+	}
+	return NewCompleter(p, model, nil), nil
+}
