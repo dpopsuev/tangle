@@ -110,9 +110,22 @@ func NewProviderFromEnv(envName string) (anyllm.Provider, error) {
 	}
 	name := os.Getenv(envName)
 	if name == "" {
-		return nil, fmt.Errorf("%w: set %s (options: %s)", ErrProviderNotSet, envName, providerOptionsHint())
+		return nil, fmt.Errorf("%w\n\n%s", ErrProviderNotSet, onboardingMessage(envName))
 	}
 	return NewProviderByName(name)
+}
+
+func onboardingMessage(envName string) string {
+	var b strings.Builder
+	b.WriteString("No LLM provider configured. Set one of:\n\n")
+	for _, p := range providers {
+		aliases := ""
+		if len(p.aliases) > 0 {
+			aliases = " (aliases: " + strings.Join(p.aliases, ", ") + ")"
+		}
+		fmt.Fprintf(&b, "  export %s=%-16s # %s%s\n", envName, p.name, p.envHint, aliases)
+	}
+	return b.String()
 }
 
 // NewProviderByName creates a provider by explicit name.
